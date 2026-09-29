@@ -1,0 +1,9 @@
+# Keep the docker build context small; nothing below is needed to build.
+build/
+.git/
+.github/
+tmp
+__pycache__/
+*.pyc
+.cache/
+.vscode/

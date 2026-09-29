@@ -55,6 +55,100 @@ ninja check
 ```
 
 
+## Docker
+
+A multi-stage `Dockerfile` based on `debian:trixie-slim` is provided, so you
+can run cpp2rust without installing LLVM and Rust locally.
+
+```bash
+docker build -t cpp2rust .
+```
+
+`cpp2rust-docker.sh` is a thin wrapper that mounts the current directory into
+the container at the same absolute path and runs the container as your
+UID/GID, so relative and absolute host paths keep working and generated
+files keep the right ownership:
+
+```bash
+./cpp2rust-docker.sh --file=hello.cpp -o=hello.rs
+./cpp2rust-docker.sh --file=hello.cpp -o=hello.rs --model=unsafe
+```
+
+It is equivalent to:
+
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" cpp2rust --file=hello.cpp -o=hello.rs
+```
+
+The image name can be overridden with `CPP2RUST_IMAGE`:
+
+```bash
+CPP2RUST_IMAGE=cpp2rust:latest ./cpp2rust-docker.sh --file=hello.cpp -o=hello.rs
+```
+
+### Translate a whole program (Docker)
+
+Generate `compile_commands.json` as usual, then run the wrapper from the
+project root. `compile_commands.json` records absolute host paths, which is
+why the wrapper mounts the current directory at the same path inside the
+container (a fixed mount point such as `/work` would break `--dir`):
+
+```bash
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+./cpp2rust-docker.sh --dir=<dir> -o <output>.rs
+```
+
+### Compile and run the generated Rust code (Docker)
+
+`cpp2rust-compile-docker.sh` compiles a translated `.rs` file inside the
+container (the binary is dynamically linked against the container's
+libraries, so it must also run there). The output defaults to the input
+stem (`hello.rs` -> `./hello`):
+
+```bash
+./cpp2rust-compile-docker.sh hello.rs
+./cpp2rust-compile-docker.sh -o hello hello.rs
+```
+
+`cpp2rust-exec-docker.sh` runs a binary inside the container. Program
+arguments after the binary are forwarded as-is, and stdin is passed through:
+
+```bash
+./cpp2rust-exec-docker.sh ./hello
+./cpp2rust-exec-docker.sh ./hello arg1 "arg 2"
+```
+
+Extra rustc flags can be appended with `CPP2RUST_RUSTFLAGS`, and the image
+overridden with `CPP2RUST_IMAGE`, just like `cpp2rust-docker.sh`.
+
+<details>
+<summary>Equivalent manual command (reference)</summary>
+
+The image ships the `libcc2rs` rlibs under `/opt/cpp2rust` and a Rust
+toolchain, so the translated file can be compiled without leaving Docker.
+The slim runtime image has no `cc`, so point rustc at the bundled `clang-23`.
+Generated code also triggers harmless style warnings (fixed prelude imports,
+extra parentheses, unused `argc`/`argv`, ignored `write!` results, ...), so
+pass `-A warnings` like the project's own test suite does
+(`tests/lit/lit/formats/Cpp2RustTest.py`):
+
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" --entrypoint sh cpp2rust -c '
+  rustc --edition 2024 hello.rs -o hello \
+    -A warnings \
+    -C linker=clang-23 \
+    -L dependency=/opt/cpp2rust/libcc2rs-target/release/deps \
+    -L dependency=/opt/cpp2rust/libc-dep-target/release/deps \
+    --extern libcc2rs=/opt/cpp2rust/libcc2rs-target/release/liblibcc2rs.rlib \
+    --extern libc=$(echo /opt/cpp2rust/libc-dep-target/release/deps/liblibc-*.rlib) \
+    --extern nix=$(echo /opt/cpp2rust/libc-dep-target/release/deps/libnix-*.rlib) \
+    --extern jiff=$(echo /opt/cpp2rust/libc-dep-target/release/deps/libjiff-*.rlib)'
+./hello
+```
+
+</details>
+
+
 ## Run
 
 ### Translate a single file
