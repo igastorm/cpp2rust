@@ -25,7 +25,10 @@ fi
 
 IMAGE="${CPP2RUST_IMAGE:-cpp2rust}"
 
-exec docker run --rm \
+# --read-only: the container never writes to its own filesystem, so it stays
+# reusable. Anything that must be writable (temp files, caches) goes to the
+# tmpfs mounted at /tmp; inputs/outputs live on the mounted work directory.
+exec docker run --rm --read-only --tmpfs /tmp \
   -u "$(id -u):$(id -g)" \
   -v "$PWD:$PWD" \
   -w "$PWD" \

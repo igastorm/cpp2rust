@@ -67,7 +67,8 @@ docker build -t cpp2rust .
 `cpp2rust-docker.sh` is a thin wrapper that mounts the current directory into
 the container at the same absolute path and runs the container as your
 UID/GID, so relative and absolute host paths keep working and generated
-files keep the right ownership:
+files keep the right ownership. Containers run `--read-only` with a tmpfs
+on `/tmp`: nothing is ever written to the container's own filesystem:
 
 ```bash
 ./cpp2rust-docker.sh --file=hello.cpp -o=hello.rs
@@ -77,7 +78,7 @@ files keep the right ownership:
 It is equivalent to:
 
 ```bash
-docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" cpp2rust --file=hello.cpp -o=hello.rs
+docker run --rm --read-only --tmpfs /tmp -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" cpp2rust --file=hello.cpp -o=hello.rs
 ```
 
 The image name can be overridden with `CPP2RUST_IMAGE`:
@@ -133,7 +134,7 @@ pass `-A warnings` like the project's own test suite does
 (`tests/lit/lit/formats/Cpp2RustTest.py`):
 
 ```bash
-docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" --entrypoint sh cpp2rust -c '
+docker run --rm --read-only --tmpfs /tmp -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" --entrypoint sh cpp2rust -c '
   rustc --edition 2024 hello.rs -o hello \
     -A warnings \
     -C linker=clang-23 \

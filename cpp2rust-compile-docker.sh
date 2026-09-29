@@ -15,7 +15,8 @@
 #   CPP2RUST_RUSTFLAGS="-C opt-level=0" ./cpp2rust-compile-docker.sh hello.rs
 #
 # NOTE: like cpp2rust-docker.sh, the .rs file and the output must live under
-# the current directory (that is what gets mounted).
+# the current directory (that is what gets mounted). The container runs
+# --read-only with a tmpfs on /tmp.
 set -eu
 
 IMAGE="${CPP2RUST_IMAGE:-cpp2rust}"
@@ -83,7 +84,7 @@ rustc --edition 2024 "$src" -o "$out" \
 SCRIPT
 )
 
-exec docker run --rm \
+exec docker run --rm --read-only --tmpfs /tmp \
   -u "$(id -u):$(id -g)" \
   -v "$PWD:$PWD" \
   -w "$PWD" \

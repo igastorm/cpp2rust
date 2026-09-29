@@ -14,7 +14,8 @@
 #   CPP2RUST_IMAGE=cpp2rust:latest ./cpp2rust-exec-docker.sh ./hello
 #
 # NOTE: like cpp2rust-docker.sh, the binary must live under the current
-# directory (that is what gets mounted).
+# directory (that is what gets mounted). The container runs --read-only
+# with a tmpfs on /tmp.
 set -eu
 
 IMAGE="${CPP2RUST_IMAGE:-cpp2rust}"
@@ -49,7 +50,7 @@ TTY=""
 [ -t 0 ] && TTY="-t"
 
 # shellcheck disable=SC2086
-exec docker run --rm -i $TTY \
+exec docker run --rm --read-only --tmpfs /tmp -i $TTY \
   -u "$(id -u):$(id -g)" \
   -v "$PWD:$PWD" \
   -w "$PWD" \
